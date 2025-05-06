@@ -1,5 +1,5 @@
 import streamlit as st
-import pyplot as plt
+from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
 import base64
@@ -14,11 +14,11 @@ data = {
         np.random.randint(60, 110, size=12),
         np.random.randint(80, 130, size=12)
     ],
-    'Value': [105, 88, 115]  # Current KPI values
+    'Value': [105, 88, 115]
 }
 df = pd.DataFrame(data)
 
-# Function to generate sparkline as base64 image
+# Fungsi generate sparkline base64
 def generate_sparkline(trend_data, color='#0f098e'):
     fig, ax = plt.subplots(figsize=(2, 0.5))
     ax.plot(trend_data, color=color, linewidth=2)
@@ -34,7 +34,7 @@ def generate_sparkline(trend_data, color='#0f098e'):
 
 df['Sparkline'] = df['Trend Data'].apply(lambda x: generate_sparkline(x, color='#0f098e'))
 
-# CSS styling for KPI cards and layout
+# CSS styling
 st.markdown(
     """
     <style>
@@ -80,10 +80,8 @@ st.markdown(
 
 st.title("Dashboard KPI")
 
-# Container for KPI cards
 st.markdown('<div class="container">', unsafe_allow_html=True)
 
-# Create clickable KPI cards using buttons with keys
 for idx, row in df.iterrows():
     card_html = f"""
     <div class="kpi-card" id="card-{idx}">
@@ -92,14 +90,12 @@ for idx, row in df.iterrows():
         <div class="sparkline">{row['Sparkline']}</div>
     </div>
     """
-    # Use st.markdown to display card, then a hidden button below for interaction
     st.markdown(card_html, unsafe_allow_html=True)
     if st.button(f"Show details for {row['KPI Name']}", key=f"btn-{idx}"):
         st.session_state['selected_kpi'] = idx
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Show detailed chart with data labels if a KPI is selected
 if 'selected_kpi' in st.session_state:
     selected_idx = st.session_state['selected_kpi']
     selected_row = df.iloc[selected_idx]
@@ -108,7 +104,6 @@ if 'selected_kpi' in st.session_state:
 
     st.subheader(f"Detail Trend for {kpi_name}")
 
-    # Plot with data labels
     fig, ax = plt.subplots(figsize=(8, 3))
     x = np.arange(1, len(trend) + 1)
     ax.plot(x, trend, marker='o', color='#0f098e', linewidth=2)
@@ -117,7 +112,6 @@ if 'selected_kpi' in st.session_state:
     ax.set_ylabel('Value')
     ax.set_title(kpi_name, color='#0f098e', fontsize=16, fontweight='bold')
 
-    # Add data labels on each point
     for i, val in enumerate(trend):
         ax.text(x[i], val + 1, str(val), ha='center', va='bottom', fontsize=9, color='#b42020')
 
