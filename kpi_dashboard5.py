@@ -1,9 +1,7 @@
 import streamlit as st
-from matplotlib import pyplot as plt
 import pandas as pd
 import numpy as np
-import base64
-import io
+import plotly.graph_objects as go
 
 # Sample KPI data
 np.random.seed(42)
@@ -18,102 +16,57 @@ data = {
 }
 df = pd.DataFrame(data)
 
-# Fungsi generate sparkline base64
-def generate_sparkline(trend_data, color='#0f098e'):
-    fig, ax = plt.subplots(figsize=(2, 0.5))
-    ax.plot(trend_data, color=color, linewidth=2)
-    ax.axis('off')
-    fig.patch.set_alpha(0)
-    plt.tight_layout(pad=0)
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=100, bbox_inches='tight', pad_inches=0)
-    buf.seek(0)
-    image_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
-    return f"<img src='data:image/png;base64,{image_base64}'/>"
+st.title("Dashboard KPI dengan Plotly")
 
-df['Sparkline'] = df['Trend Data'].apply(lambda x: generate_sparkline(x, color='#0f098e'))
+# Fungsi untuk membuat sparkline dengan Plotly
+def generate_sparkline(trend_data):
+    fig = go.Figure(go.Scatter(
+        y=trend_data,
+        mode='lines',
+        line=dict(color='#0f098e', width=2),
+        hoverinfo='y'
+    ))
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=40,
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False)
+    )
+    return fig
 
-# CSS styling
-st.markdown(
-    """
-    <style>
-    .kpi-card {
-        background-color: #0f098e;
-        color: white;
-        padding: 15px;
-        border-radius: 10px;
-        width: 250px;
-        display: inline-block;
-        margin: 10px 10px 10px 0;
-        vertical-align: top;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        cursor: pointer;
-        user-select: none;
-        transition: transform 0.1s ease-in-out;
-    }
-    .kpi-card:hover {
-        transform: scale(1.05);
-    }
-    .kpi-title {
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-    .kpi-value {
-        font-size: 28px;
-        font-weight: bold;
-        color: #b42020;
-        margin-bottom: 5px;
-    }
-    .sparkline {
-        margin-top: 5px;
-    }
-    .container {
-        white-space: nowrap;
-        overflow-x: auto;
-        padding-bottom: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True
+# Tampilkan kartu KPI dengan sparkline
+cols = st.columns(len(df))
+for idx, row in df.iterrows():
+    with cols[idx]:
+        st.markdown(f"### {row['KPI Name']}")
+        st.markdown(f"<span style='color:#b42020; font-size:24px; font-weight:bold'>{row['Value']}</span>", unsafe_allow_html=True)
+        spark_fig = generate_sparkline(row['Trend Data'])
+        st.plotly_chart(spark_fig, use_container_width=True)
+
+# Pilih KPI untuk detail grafik
+selected_kpi = st.selectbox("Pilih KPI untuk detail grafik:", df['KPI Name'])
+
+# Grafik detail dengan data label
+selected_row = df[df['KPI Name'] == selected_kpi].iloc[0]
+trend = selected_row['Trend Data']
+months = [f'Bulan {i+1}' for i in range(len(trend))]
+
+fig_detail = go.Figure(go.Scatter(
+    x=months,
+    y=trend,
+    mode='lines+markers+text',
+    text=trend,
+    textposition='top center',
+    line=dict(color='#0f098e', width=3),
+    marker=dict(size=8, color='#b42020')
+))
+
+fig_detail.update_layout(
+    title=f"Detail Trend {selected_kpi}",
+    xaxis_title="Bulan",
+    yaxis_title="Nilai",
+    margin=dict(l=40, r=40, t=40, b=40),
+    height=400
 )
 
-st.title("Dashboard KPI")
-
-st.markdown('<div class="container">', unsafe_allow_html=True)
-
-for idx, row in df.iterrows():
-    card_html = f"""
-    <div class="kpi-card" id="card-{idx}">
-        <div class="kpi-title">{row['KPI Name']}</div>
-        <div class="kpi-value">{row['Value']}</div>
-        <div class="sparkline">{row['Sparkline']}</div>
-    </div>
-    """
-    st.markdown(card_html, unsafe_allow_html=True)
-    if st.button(f"Show details for {row['KPI Name']}", key=f"btn-{idx}"):
-        st.session_state['selected_kpi'] = idx
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-if 'selected_kpi' in st.session_state:
-    selected_idx = st.session_state['selected_kpi']
-    selected_row = df.iloc[selected_idx]
-    trend = selected_row['Trend Data']
-    kpi_name = selected_row['KPI Name']
-
-    st.subheader(f"Detail Trend for {kpi_name}")
-
-    fig, ax = plt.subplots(figsize=(8, 3))
-    x = np.arange(1, len(trend) + 1)
-    ax.plot(x, trend, marker='o', color='#0f098e', linewidth=2)
-    ax.set_xticks(x)
-    ax.set_xticklabels([f'Month {i}' for i in x], rotation=45)
-    ax.set_ylabel('Value')
-    ax.set_title(kpi_name, color='#0f098e', fontsize=16, fontweight='bold')
-
-    for i, val in enumerate(trend):
-        ax.text(x[i], val + 1, str(val), ha='center', va='bottom', fontsize=9, color='#b42020')
-
-    ax.grid(True, linestyle='--', alpha=0.5)
-    st.pyplot(fig)
+st.plotly_chart(fig_detail, use_container_width=True)
