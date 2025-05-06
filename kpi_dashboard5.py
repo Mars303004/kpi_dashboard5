@@ -1,9 +1,10 @@
 import streamlit as st
-from matplotlib import pyplot as plt
+import pyplot as plt
 import pandas as pd
 import numpy as np
 import base64
 import io
+import matplotlib
 
 # Sample KPI data
 np.random.seed(42)
