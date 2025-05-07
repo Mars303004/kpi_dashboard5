@@ -1,91 +1,117 @@
-import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
+import streamlit as st
+from streamlit_extras.grid import grid
 
-# Sample KPI data
-np.random.seed(42)
-data = {
-    'KPI Name': ['Revenue Growth', 'Customer Satisfaction', 'Efficiency Ratio'],
-    'Trend Data': [
-        np.random.randint(70, 120, size=12),
-        np.random.randint(60, 110, size=12),
-        np.random.randint(80, 130, size=12)
-    ],
-    'Value': [105, 88, 115]
+# --- Page Config & Styling ---
+st.set_page_config(layout="wide")
+st.markdown("""
+    <style>
+        body {
+            background-color: #ffffff;
+        }
+        .highlight-red {
+            background-color: rgba(255, 0, 0, 0.1);
+            border-left: 5px solid red;
+            padding: 10px;
+            border-radius: 8px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px red; }
+            100% { box-shadow: 0 0 20px red; }
+        }
+        .kpi-box {
+            background-color: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 5px;
+            text-align: center;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Title ---
+st.markdown("""
+    <h1 style='color: #0f098e;'>📊 KPI Dashboard</h1>
+""", unsafe_allow_html=True)
+
+# --- Filter UI ---
+selected_perspectives = st.multiselect("Pilih Perspective:", ["FIN", "CM", "IP", "LG"], default=["IP"])
+status_options = ["🔴 Merah", "🟡 Kuning", "🟢 Hijau", "⚫ Hitam"]
+selected_status = st.selectbox("Pilih warna status:", status_options, index=0)
+
+# --- Read Data ---
+excel_file = "Coba excel.xlsx"
+df = pd.read_excel(excel_file, sheet_name="Dulu")
+
+status_mapping = {
+    "Merah": "🔴 Merah",
+    "Kuning": "🟡 Kuning",
+    "Hijau": "🟢 Hijau",
+    "Hitam": "⚫ Hitam"
 }
-df = pd.DataFrame(data)
 
-# Fungsi untuk menentukan warna indikator
-def get_color(value):
-    if pd.isna(value):
-        return "#000000"  # Hitam
-    elif value > 100:
-        return "#00aa00"  # Hijau
-    elif value >= 70:
-        return "#ffcc00"  # Kuning
-    else:
-        return "#b42020"  # Merah
+# --- Filtered Data ---
+filtered_df = df[df['Perspective'].isin(selected_perspectives)]
+filtered_df = filtered_df[filtered_df['Traffic Light'] == selected_status.split()[1]]
 
-# Fungsi untuk membuat sparkline dengan Plotly
-def generate_sparkline(trend_data, color="#0f098e"):
-    fig = go.Figure(go.Scatter(
-        y=trend_data,
-        mode='lines',
-        line=dict(color=color, width=2),
-        hoverinfo='y'
-    ))
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=60,
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False)
-    )
-    return fig
+# --- Top Best & Worst KPI ---
+st.markdown("""
+### 🔍 Highlight KPI
+""")
+col1, col2 = st.columns(2)
 
-# Judul
-st.title("📈 Dashboard KPI Interaktif")
+with col1:
+    st.markdown("#### ❌ Top 5 Worst KPI")
+    worst = df.sort_values("%Achv", ascending=True).head(5)
+    st.dataframe(worst[["KPI", "%Achv"]], use_container_width=True)
 
-# Tampilkan kartu KPI 2 kolom
-for i in range(0, len(df), 2):
-    cols = st.columns(2)
-    for j in range(2):
-        if i + j < len(df):
-            row = df.iloc[i + j]
-            color = get_color(row['Value'])
-            with cols[j]:
-                st.markdown(f"### {row['KPI Name']}")
-                st.markdown(
-                    f"<span style='color:{color}; font-size:24px; font-weight:bold'>{row['Value']}</span>",
-                    unsafe_allow_html=True
-                )
-                spark_fig = generate_sparkline(row['Trend Data'])
-                st.plotly_chart(spark_fig, use_container_width=True)
+with col2:
+    st.markdown("#### ✅ Top 5 Best KPI")
+    best = df.sort_values("%Achv", ascending=False).head(5)
+    st.dataframe(best[["KPI", "%Achv"]], use_container_width=True)
 
-# Pilih KPI untuk detail grafik
-selected_kpi = st.selectbox("📊 Pilih KPI untuk lihat detail trend:", df['KPI Name'])
+# --- Compact KPI Cards ---
+st.markdown("""
+### 📋 KPI Details
+""")
+kpi_grid = grid(3, vertical_align="top")
 
-# Grafik detail
-selected_row = df[df['KPI Name'] == selected_kpi].iloc[0]
-trend = selected_row['Trend Data']
-months = [f'Bulan {i+1}' for i in range(len(trend))]
+for i, row in filtered_df.iterrows():
+    with kpi_grid.container():
+        st.markdown(f"""
+            <div class="highlight-red">
+                <strong>{row['KPI']}</strong><br>
+                🎯 Target: {row['Target Feb']}<br>
+                📈 Aktual: {row['Actual Feb']}<br>
+                📉 Bulan Lalu: {row['Actual Jan']}<br>
+            </div>
+        """, unsafe_allow_html=True)
 
-fig_detail = go.Figure(go.Scatter(
-    x=months,
-    y=trend,
-    mode='lines+markers+text',
-    text=trend,
-    textposition='top center',
-    line=dict(color='#0f098e', width=3),
-    marker=dict(size=8, color='#b42020')
-))
+        sparkline_fig = go.Figure(go.Scatter(
+            x=["Jan", "Feb"],
+            y=[row['Actual Jan'], row['Actual Feb']],
+            mode="lines+markers",
+            line=dict(color="#b42020"),
+            marker=dict(size=6)
+        ))
+        sparkline_fig.update_layout(
+            margin=dict(l=10, r=10, t=30, b=10),
+            height=150,
+            title=dict(text="Sparkline Trend", x=0.5),
+            xaxis=dict(showgrid=False, zeroline=False),
+            yaxis=dict(showgrid=False, zeroline=False)
+        )
+        st.plotly_chart(sparkline_fig, use_container_width=True)
 
-fig_detail.update_layout(
-    title=f"Detail Trend: {selected_kpi}",
-    xaxis_title="Bulan",
-    yaxis_title="Nilai",
-    margin=dict(l=40, r=40, t=40, b=40),
-    height=400
-)
+# Optional: Summary Box with Color Count
+total_counts = df.groupby('Traffic Light')['KPI'].count()
+color_cols = st.columns(4)
+colors = ['Merah', 'Kuning', 'Hijau', 'Hitam']
+emoji = ['🔴', '🟡', '🟢', '⚫']
 
-st.plotly_chart(fig_detail, use_container_width=True)
+for i, c in enumerate(colors):
+    with color_cols[i]:
+        st.metric(label=f"{emoji[i]} {c}", value=total_counts.get(c, 0))
